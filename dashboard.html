@@ -88,7 +88,7 @@
       padding: 3px;
     }
     .tab-btn {
-      padding: 6px 18px; font-size: 13px; font-weight: 600;
+      padding: 5px 13px; font-size: 12px; font-weight: 600;
       border-radius: 8px; cursor: pointer; border: none;
       color: rgba(255,255,255,.6);
       background: transparent;
@@ -126,6 +126,41 @@
     .cmp-up { background: #dcfce7; color: #166534; }
     .cmp-down { background: #fee2e2; color: #991b1b; }
     .cmp-neutral { background: #f3f4f6; color: #6b7280; }
+
+    /* ── Goal progress bars ── */
+    .goal-bar-bg { height: 6px; background: #f0ece7; border-radius: 9999px; overflow: hidden; margin-top: 8px; }
+    .goal-bar-fill { height: 100%; border-radius: 9999px; transition: width .5s ease; }
+    .goal-bar-label { display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; margin-top: 3px; }
+
+    /* ── Alert highlight on KPI cards ── */
+    .kpi-alert { border: 2px solid #fca5a5 !important; background: #fff5f5 !important; }
+    .kpi-warn  { border: 2px solid #fde68a !important; background: #fffbeb !important; }
+
+    /* ── Refresh dot ── */
+    .refresh-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display:inline-block; animation: pulse2 2s infinite; }
+    @keyframes pulse2 { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+    /* ── Goals modal ── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:2000; opacity:0; pointer-events:none; transition:opacity .2s; }
+    .modal-overlay.open { opacity:1; pointer-events:all; }
+    .modal-box { background:#fff; border-radius:16px; padding:28px; width:480px; max-width:95vw; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+
+    /* ── AI Chat panel ── */
+    .chat-fab { position:fixed; bottom:24px; right:24px; z-index:1500; width:52px; height:52px; border-radius:50%; background:#e85d26; color:#fff; border:none; cursor:pointer; box-shadow:0 4px 16px rgba(232,93,38,.45); font-size:22px; display:flex; align-items:center; justify-content:center; transition:transform .2s, box-shadow .2s; }
+    .chat-fab:hover { transform:scale(1.08); box-shadow:0 6px 24px rgba(232,93,38,.55); }
+    .chat-panel { position:fixed; bottom:88px; right:24px; z-index:1500; width:380px; max-width:calc(100vw - 48px); background:#fff; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,.2); display:flex; flex-direction:column; overflow:hidden; transform:translateY(20px) scale(.95); opacity:0; pointer-events:none; transition:all .2s ease; }
+    .chat-panel.open { transform:translateY(0) scale(1); opacity:1; pointer-events:all; }
+    .chat-header { background:#0f0f0f; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+    .chat-messages { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; min-height:200px; max-height:320px; }
+    .chat-msg { padding:8px 12px; border-radius:12px; font-size:13px; line-height:1.6; max-width:90%; }
+    .chat-msg.user { background:#e85d26; color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+    .chat-msg.ai { background:#f5f3f0; color:#1a1a1a; align-self:flex-start; border-bottom-left-radius:4px; white-space:pre-wrap; }
+    .chat-msg.typing { color:#9ca3af; font-style:italic; }
+    .chat-input-row { display:flex; gap:8px; padding:10px 12px; border-top:1px solid #f0ece7; }
+    .chat-input { flex:1; border:1px solid #e5e0d8; border-radius:20px; padding:8px 14px; font-size:13px; outline:none; resize:none; font-family:inherit; }
+    .chat-input:focus { border-color:#e85d26; }
+    .chat-send-btn { background:#e85d26; color:#fff; border:none; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:15px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+    .chat-key-wrap { padding:10px 12px; border-top:1px solid #f0ece7; background:#fafafa; }
   </style>
 </head>
 <body class="min-h-screen">
@@ -144,27 +179,31 @@
 
 <!-- Header -->
 <header style="background:#0f0f0f; position:sticky; top:0; z-index:100; box-shadow:0 2px 12px rgba(0,0,0,.3);">
-  <div style="max-width:1600px; margin:0 auto; padding:10px 20px;">
-    <!-- Title + Tab row -->
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <div style="display:flex; align-items:center; gap:14px;">
-        <span style="font-size:13px; font-weight:800; color:#e85d26; letter-spacing:.12em; text-transform:uppercase;">ARRCH</span>
-        <span style="color:rgba(255,255,255,.2); font-size:16px;">|</span>
-        <h1 style="font-size:14px; font-weight:700; color:#fff; letter-spacing:.01em;">住宅事業 営業ダッシュボード</h1>
-      </div>
+  <div style="max-width:1600px; margin:0 auto; padding:8px 20px;">
+    <!-- Row 1: Title + Controls -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
       <div style="display:flex; align-items:center; gap:10px;">
-        <!-- Tab navigation -->
-        <nav class="tab-nav">
-          <button class="tab-btn active" data-tab="summary">📊 サマリー</button>
-          <button class="tab-btn" data-tab="funnel">📈 ファネル</button>
-          <button class="tab-btn" data-tab="team">👥 チーム</button>
-          <button class="tab-btn" data-tab="predict">🎯 予測</button>
-        </nav>
-        <span id="last-update" style="font-size:11px; color:#6b6b6b;">-</span>
-        <button onclick="init()" style="background:#e85d26; color:#fff; border:none; padding:5px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;" onmouseover="this.style.background='#d4480a'" onmouseout="this.style.background='#e85d26'">↻ 更新</button>
+        <span style="font-size:13px; font-weight:800; color:#e85d26; letter-spacing:.12em;">ARRCH</span>
+        <span style="color:rgba(255,255,255,.2);">|</span>
+        <h1 style="font-size:13px; font-weight:700; color:#fff;">住宅事業 営業ダッシュボード</h1>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span id="refresh-indicator" style="font-size:11px; color:rgba(255,255,255,.4); display:flex; align-items:center; gap:4px;"><span class="refresh-dot"></span>自動更新</span>
+        <span id="last-update" style="font-size:11px; color:#6b6b6b;"></span>
+        <button onclick="init()" style="background:#e85d26; color:#fff; border:none; padding:4px 12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;" onmouseover="this.style.background='#d4480a'" onmouseout="this.style.background='#e85d26'">↻ 更新</button>
       </div>
     </div>
-    <!-- Filter row -->
+    <!-- Row 2: Tab nav -->
+    <div style="margin-bottom:5px;">
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="summary">📊 サマリー</button>
+        <button class="tab-btn" data-tab="funnel">📈 ファネル</button>
+        <button class="tab-btn" data-tab="team">👥 チーム</button>
+        <button class="tab-btn" data-tab="predict">🎯 予測</button>
+        <button class="tab-btn" data-tab="goals">⚙️ 目標設定</button>
+      </nav>
+    </div>
+    <!-- Row 3: Filter -->
     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
       <div style="display:flex; gap:4px;" id="period-filter-wrap">
         <button class="preset-btn" data-preset="month">今月</button>
@@ -198,6 +237,9 @@
     </div>
   </div>
 </header>
+
+<!-- Alert Banner -->
+<div id="alert-banner" style="display:none; background:#fffbeb; border-bottom:2px solid #fde68a; padding:8px 20px; flex-wrap:wrap; align-items:center; gap:8px; max-width:100%;"></div>
 
 <!-- Main -->
 <main style="max-width:1600px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:20px;">
@@ -348,7 +390,105 @@
 
   </div>
 
+  <!-- ════════════════════════════════════════════════════
+       TAB 5: 目標設定
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-goals" class="tab-panel">
+
+    <!-- 年度別棟数目標 -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <p class="sec-title" style="margin-bottom:0;">年度別 棟数目標</p>
+        <button onclick="addYearRow()" style="background:#e85d26; color:#fff; border:none; padding:5px 16px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;">＋ 年度追加</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="dtable">
+          <thead>
+            <tr>
+              <th>年度</th>
+              <th>P申込目標（棟）</th>
+              <th>新規接触目標</th>
+              <th>カフェ目標</th>
+              <th>LP目標</th>
+              <th>備考</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="annual-goals-tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+        <button onclick="saveAnnualGoals()" style="background:#1a1a1a; color:#fff; border:none; padding:8px 24px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">💾 保存</button>
+      </div>
+    </div>
+
+    <!-- 今期進捗 vs 年度目標 -->
+    <div class="card">
+      <p class="sec-title">今期進捗 vs 年度目標</p>
+      <div id="annual-progress-bars"></div>
+    </div>
+
+    <!-- 月次目標・アラート閾値 -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <p class="sec-title" style="margin-bottom:0;">月次目標・アラート閾値</p>
+        <span style="font-size:11px; color:#9ca3af;">目標を下回るとヘッダーにアラート表示</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;" id="monthly-goals-grid"></div>
+      <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+        <button onclick="saveGoalsFromTab()" style="background:#e85d26; color:#fff; border:none; padding:8px 24px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;">💾 保存して反映</button>
+      </div>
+    </div>
+
+  </div>
+
 </main>
+
+<!-- ════ Goals Modal ════ -->
+<div id="goals-modal" class="modal-overlay" onclick="if(event.target===this)closeGoalsModal()">
+  <div class="modal-box">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <h2 style="font-size:16px; font-weight:800;">🎯 月次目標・アラート設定</h2>
+      <button onclick="closeGoalsModal()" style="background:none; border:none; cursor:pointer; font-size:20px; color:#9ca3af; line-height:1;">✕</button>
+    </div>
+    <p style="font-size:12px; color:#9ca3af; margin-bottom:20px;">設定はこのブラウザに保存されます。目標・基準を下回るとアラートが表示されます。</p>
+    <div style="display:flex; flex-direction:column; gap:14px;" id="goals-form"></div>
+    <div style="display:flex; gap:10px; margin-top:24px; justify-content:flex-end;">
+      <button onclick="closeGoalsModal()" style="padding:8px 18px; border-radius:8px; border:1px solid #e5e0d8; background:#fff; cursor:pointer; font-size:13px;">キャンセル</button>
+      <button onclick="saveGoalsFromForm()" style="padding:8px 24px; border-radius:8px; border:none; background:#e85d26; color:#fff; cursor:pointer; font-size:13px; font-weight:700;">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ AI Chat ════ -->
+<button class="chat-fab" onclick="toggleChat()" title="AI営業アシスタント">💬</button>
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-header">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:18px;">🤖</span>
+      <div>
+        <div style="font-size:13px; font-weight:700;">AI営業アシスタント</div>
+        <div style="font-size:10px; color:rgba(255,255,255,.45);">Powered by Gemini</div>
+      </div>
+    </div>
+    <button onclick="toggleChat()" style="background:none; border:none; color:rgba(255,255,255,.5); cursor:pointer; font-size:18px; line-height:1;">✕</button>
+  </div>
+  <div id="chat-key-section" class="chat-key-wrap" style="display:none;">
+    <p style="font-size:11px; color:#6b7280; margin-bottom:6px;">Gemini APIキーを入力（一度入力すれば保存されます）</p>
+    <div style="display:flex; gap:6px;">
+      <input type="password" id="gemini-key-input" placeholder="AIzaSy..." style="flex:1; border:1px solid #e5e0d8; border-radius:8px; padding:6px 10px; font-size:12px; font-family:monospace; outline:none;">
+      <button onclick="saveGeminiKey()" style="padding:6px 14px; background:#e85d26; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; white-space:nowrap;">保存</button>
+    </div>
+    <p style="font-size:10px; color:#9ca3af; margin-top:5px;"><a href="https://aistudio.google.com/apikey" target="_blank" style="color:#e85d26;">aistudio.google.com</a> でAPIキーを取得できます</p>
+  </div>
+  <div id="chat-messages" class="chat-messages">
+    <div class="chat-msg ai">こんにちは！営業データについて何でも聞いてください。<br><br>例：「今月の成績を分析して」「歩留まりを改善するには？」「田中さんの強みは？」</div>
+  </div>
+  <div class="chat-input-row">
+    <textarea id="chat-input" class="chat-input" placeholder="質問を入力… (Enterで送信)" rows="1" onkeydown="onChatKeydown(event)"></textarea>
+    <button class="chat-send-btn" onclick="sendChat()">➤</button>
+  </div>
+</div>
 
 <script>
 // ─────────────────────────────────────────────────────────────
@@ -376,6 +516,276 @@ let allValidRows = [];
 let charts = {};
 let currentTab = 'summary';
 const filterState = { start: null, end: null, staffList: [] };
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE 1: AUTO-REFRESH (15min)
+// ─────────────────────────────────────────────────────────────
+let _autoRefreshTimer = null;
+function startAutoRefresh() {
+  if (_autoRefreshTimer) clearInterval(_autoRefreshTimer);
+  document.getElementById('refresh-indicator').style.display = 'flex';
+  _autoRefreshTimer = setInterval(() => init(), 15 * 60 * 1000);
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE 2: GOAL SETTING
+// ─────────────────────────────────────────────────────────────
+const GOALS_KEY = 'arrch_goals_v1';
+const GOALS_DEF = [
+  { key: 'newContacts',  label: '新規接触数（今月目標）',   unit: '件', default: 60  },
+  { key: 'cafe',         label: 'カフェ実施数（今月目標）', unit: '件', default: 30  },
+  { key: 'lp',           label: 'LP実施数（今月目標）',     unit: '件', default: 15  },
+  { key: 'contract',     label: 'P申込数（今月目標）',      unit: '件', default: 3   },
+  { key: 'cafeRate',     label: 'カフェ率 最低ライン',       unit: '%',  default: 50  },
+  { key: 'contractRate', label: 'P申込率 最低ライン',        unit: '%',  default: 10  },
+];
+function loadGoals() {
+  try { return { ...Object.fromEntries(GOALS_DEF.map(g => [g.key, g.default])), ...JSON.parse(localStorage.getItem(GOALS_KEY) || '{}') }; }
+  catch(e) { return Object.fromEntries(GOALS_DEF.map(g => [g.key, g.default])); }
+}
+function openGoalsModal() {
+  const goals = loadGoals();
+  document.getElementById('goals-form').innerHTML = GOALS_DEF.map(g => `
+    <div>
+      <label style="font-size:12px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">${g.label}</label>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <input type="number" id="goal-${g.key}" value="${goals[g.key]}" min="0"
+          style="width:120px; border:1px solid #e5e0d8; border-radius:8px; padding:7px 10px; font-size:15px; text-align:right; outline:none;">
+        <span style="font-size:13px; color:#9ca3af;">${g.unit}</span>
+      </div>
+    </div>`).join('');
+  document.getElementById('goals-modal').classList.add('open');
+}
+function closeGoalsModal() { document.getElementById('goals-modal').classList.remove('open'); }
+function saveGoalsFromForm() {
+  const goals = {};
+  GOALS_DEF.forEach(g => { const v = parseFloat(document.getElementById('goal-'+g.key)?.value); if(!isNaN(v)) goals[g.key]=v; });
+  localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  closeGoalsModal();
+  applyFilters();
+}
+// ─────────────────────────────────────────────────────────────
+// GOALS TAB – 年度別目標
+// ─────────────────────────────────────────────────────────────
+const ANNUAL_GOALS_KEY = 'arrch_annual_goals_v1';
+
+function loadAnnualGoals() {
+  try { return JSON.parse(localStorage.getItem(ANNUAL_GOALS_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function addYearRow(data = {}) {
+  const tbody = document.getElementById('annual-goals-tbody');
+  const yr = data.year || new Date().getFullYear();
+  const tr = document.createElement('tr');
+  tr.dataset.id = Date.now();
+  tr.innerHTML = `
+    <td><input type="number" value="${yr}" min="2020" max="2050" style="width:80px; border:1px solid #e5e0d8; border-radius:6px; padding:5px 8px; font-size:13px; text-align:center;" class="ag-year"></td>
+    <td><input type="number" value="${data.contract||''}" placeholder="0" min="0" style="width:90px; border:1px solid #e5e0d8; border-radius:6px; padding:5px 8px; font-size:13px; text-align:right;" class="ag-contract"> 棟</td>
+    <td><input type="number" value="${data.newContacts||''}" placeholder="0" min="0" style="width:90px; border:1px solid #e5e0d8; border-radius:6px; padding:5px 8px; font-size:13px; text-align:right;" class="ag-new"> 件</td>
+    <td><input type="number" value="${data.cafe||''}" placeholder="0" min="0" style="width:90px; border:1px solid #e5e0d8; border-radius:6px; padding:5px 8px; font-size:13px; text-align:right;" class="ag-cafe"> 件</td>
+    <td><input type="number" value="${data.lp||''}" placeholder="0" min="0" style="width:90px; border:1px solid #e5e0d8; border-radius:6px; padding:5px 8px; font-size:13px; text-align:right;" class="ag-lp"> 件</td>
+    <td><input type="text" value="${data.note||''}" placeholder="備考" style="width:140px; border:1px solid #e5e0d8; border-radius:6px; padding:5px 8px; font-size:13px;" class="ag-note"></td>
+    <td><button onclick="this.closest('tr').remove()" style="background:#fee2e2; color:#991b1b; border:none; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:12px;">削除</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function saveAnnualGoals() {
+  const rows = [...document.querySelectorAll('#annual-goals-tbody tr')].map(tr => ({
+    year:        parseInt(tr.querySelector('.ag-year')?.value) || null,
+    contract:    parseInt(tr.querySelector('.ag-contract')?.value) || 0,
+    newContacts: parseInt(tr.querySelector('.ag-new')?.value) || 0,
+    cafe:        parseInt(tr.querySelector('.ag-cafe')?.value) || 0,
+    lp:          parseInt(tr.querySelector('.ag-lp')?.value) || 0,
+    note:        tr.querySelector('.ag-note')?.value || '',
+  })).filter(r => r.year);
+  localStorage.setItem(ANNUAL_GOALS_KEY, JSON.stringify(rows));
+  renderAnnualProgress();
+  alert('年度目標を保存しました ✓');
+}
+
+function renderGoalsTab() {
+  // 年度別テーブル
+  const saved = loadAnnualGoals();
+  const tbody = document.getElementById('annual-goals-tbody');
+  tbody.innerHTML = '';
+  if (saved.length === 0) addYearRow({ year: new Date().getFullYear() });
+  else saved.forEach(d => addYearRow(d));
+
+  renderAnnualProgress();
+
+  // 月次目標グリッド
+  const goals = loadGoals();
+  document.getElementById('monthly-goals-grid').innerHTML = GOALS_DEF.map(g => `
+    <div style="background:#f9f7f5; border-radius:10px; padding:14px 16px;">
+      <label style="font-size:11px; font-weight:700; color:#9ca3af; display:block; margin-bottom:8px; letter-spacing:.06em; text-transform:uppercase;">${g.label}</label>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <input type="number" id="gtab-${g.key}" value="${goals[g.key]}" min="0"
+          style="flex:1; border:1px solid #e5e0d8; border-radius:8px; padding:8px 10px; font-size:18px; font-weight:700; text-align:right; outline:none; background:#fff;">
+        <span style="font-size:13px; color:#9ca3af; flex-shrink:0;">${g.unit}</span>
+      </div>
+    </div>`).join('');
+}
+
+function saveGoalsFromTab() {
+  const goals = {};
+  GOALS_DEF.forEach(g => { const v = parseFloat(document.getElementById('gtab-'+g.key)?.value); if(!isNaN(v)) goals[g.key]=v; });
+  localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  checkAlerts();
+  renderAnnualProgress();
+  const btn = event.target;
+  btn.textContent = '✓ 保存しました'; btn.style.background = '#22c55e';
+  setTimeout(() => { btn.textContent = '💾 保存して反映'; btn.style.background = '#e85d26'; }, 2000);
+}
+
+function renderAnnualProgress() {
+  const annualGoals = loadAnnualGoals();
+  const thisYear = new Date().getFullYear();
+  const yearGoal = annualGoals.find(g => g.year === thisYear);
+  const el = document.getElementById('annual-progress-bars');
+  if (!el) return;
+  if (!yearGoal) { el.innerHTML = '<p style="color:#9ca3af; font-size:13px;">目標タブで今年度の目標を設定してください。</p>'; return; }
+
+  const base = getAdvRows();
+  const fyStart = new Date(thisYear, 0, 1);
+  const today   = new Date();
+  const cnt = col => base.filter(r => { const d = parseGvizDate(getCell(r, col)); return d && d >= fyStart && d <= today; }).length;
+  const actuals = { contract: cnt(C.CONTRACT), newContacts: cnt(C.FIRST_CONTACT), cafe: cnt(C.CAFE_DATE), lp: cnt(C.LP_DATE) };
+  const labels  = { contract: 'P申込（棟）', newContacts: '新規接触', cafe: 'カフェ実施', lp: 'LP実施' };
+  const units   = { contract: '棟', newContacts: '件', cafe: '件', lp: '件' };
+
+  el.innerHTML = `<p style="font-size:13px; font-weight:700; margin-bottom:16px; color:#1a1a1a;">${thisYear}年度 進捗状況</p>` +
+    Object.keys(actuals).filter(k => yearGoal[k] > 0).map(k => {
+      const act = actuals[k], tgt = yearGoal[k];
+      const pct = Math.min(100, Math.round(act / tgt * 100));
+      const col = pct >= 100 ? '#22c55e' : pct >= 70 ? '#f59e0b' : '#ef4444';
+      return `<div style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+          <span style="font-size:13px; font-weight:600;">${labels[k]}</span>
+          <span style="font-size:13px;"><strong style="color:${col};">${act}${units[k]}</strong> / ${tgt}${units[k]}</span>
+        </div>
+        <div class="goal-bar-bg" style="height:12px;">
+          <div class="goal-bar-fill" style="width:${pct}%; background:${col}; height:100%;"></div>
+        </div>
+        <div class="goal-bar-label"><span>${today.getMonth()+1}月時点</span><span style="color:${col}; font-weight:700;">${pct}%達成</span></div>
+      </div>`;
+    }).join('');
+}
+
+function goalBar(actual, target, unit='') {
+  if (!target) return '';
+  const pct = Math.min(100, Math.round(actual / target * 100));
+  const col = pct >= 100 ? '#22c55e' : pct >= 70 ? '#f59e0b' : '#ef4444';
+  return `<div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%;background:${col};"></div></div>
+          <div class="goal-bar-label"><span>目標 ${target}${unit}</span><span style="color:${col};font-weight:700;">${pct}%</span></div>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE 3: ALERT SYSTEM
+// ─────────────────────────────────────────────────────────────
+function checkAlerts() {
+  const goals = loadGoals();
+  const today = new Date();
+  const mStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const mEnd   = today;
+  const base   = getAdvRows();
+  const cnt = col => base.filter(r => { const d = parseGvizDate(getCell(r, col)); return d && d >= mStart && d <= mEnd; }).length;
+  const newC = cnt(C.FIRST_CONTACT), cafe = cnt(C.CAFE_DATE), contract = cnt(C.CONTRACT);
+  const cafeRate = newC > 0 ? cafe/newC*100 : 0;
+  const contractRate = newC > 0 ? contract/newC*100 : 0;
+  const alerts = [];
+  if (newC < goals.newContacts * 0.7)  alerts.push({ lv:'warn',  msg:`新規接触 ${newC}件（目標${goals.newContacts}件）` });
+  if (cafe < goals.cafe * 0.7)         alerts.push({ lv:'warn',  msg:`カフェ実施 ${cafe}件（目標${goals.cafe}件）` });
+  if (cafeRate < goals.cafeRate && newC >= 5)       alerts.push({ lv:'alert', msg:`カフェ率 ${cafeRate.toFixed(0)}%（基準${goals.cafeRate}%）` });
+  if (contractRate < goals.contractRate && newC >= 10) alerts.push({ lv:'alert', msg:`P申込率 ${contractRate.toFixed(1)}%（基準${goals.contractRate}%）` });
+  const el = document.getElementById('alert-banner');
+  if (!el) return;
+  if (alerts.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = `<span style="font-size:15px;">⚠️</span><span style="font-weight:700;font-size:13px;">今月アラート:</span>
+    ${alerts.map(a => `<span class="badge ${a.lv==='alert'?'badge-red':'badge-yellow'}">${a.msg}</span>`).join('')}
+    <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:18px;line-height:1;">✕</button>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// FEATURE 4: GEMINI AI CHAT
+// ─────────────────────────────────────────────────────────────
+const GEMINI_KEY_SK = 'arrch_gemini_key';
+function toggleChat() {
+  const panel = document.getElementById('chat-panel');
+  const hasKey = !!localStorage.getItem(GEMINI_KEY_SK);
+  document.getElementById('chat-key-section').style.display = hasKey ? 'none' : 'block';
+  panel.classList.toggle('open');
+}
+function saveGeminiKey() {
+  const k = document.getElementById('gemini-key-input').value.trim();
+  if (!k) return;
+  localStorage.setItem(GEMINI_KEY_SK, k);
+  document.getElementById('chat-key-section').style.display = 'none';
+  appendMsg('ai', 'APIキーを保存しました！何でも質問してください 🎉');
+}
+function buildGeminiContext() {
+  const base = getAdvRows();
+  const today = new Date();
+  const mStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const fyStart = new Date(today.getFullYear(), 0, 1);
+  const cnt = (col, s, e) => base.filter(r => { const d = parseGvizDate(getCell(r, col)); return d && d >= s && d <= e; }).length;
+  const m = { new: cnt(C.FIRST_CONTACT, mStart, today), cafe: cnt(C.CAFE_DATE, mStart, today), lp: cnt(C.LP_DATE, mStart, today), hb: cnt(C.HB_DATE, mStart, today), contract: cnt(C.CONTRACT, mStart, today) };
+  const fy = { new: cnt(C.FIRST_CONTACT, fyStart, today), cafe: cnt(C.CAFE_DATE, fyStart, today), contract: cnt(C.CONTRACT, fyStart, today) };
+  const goals = loadGoals();
+  const advTop = [...new Set(base.map(r => getVal(r, C.ADV)).filter(Boolean))].map(name => {
+    const sr = base.filter(r => getVal(r, C.ADV) === name);
+    return { name, contract: sr.filter(r => { const d = parseGvizDate(getCell(r, C.CONTRACT)); return d && d >= fyStart; }).length, cafe: sr.filter(r => parseGvizDate(getCell(r, C.CAFE_DATE))).length, total: sr.length };
+  }).sort((a,b) => b.contract-a.contract).slice(0, 6);
+  return `あなたはARRCH住宅事業の優秀な営業コンサルタントです。以下の実績データを基に、具体的・実践的なアドバイスを日本語で提供してください。
+
+【今月実績（${today.getFullYear()}年${today.getMonth()+1}月）】
+新規接触: ${m.new}件 / 目標${goals.newContacts}件（達成率${goals.newContacts?Math.round(m.new/goals.newContacts*100):'-'}%）
+カフェ実施: ${m.cafe}件 / 目標${goals.cafe}件  カフェ率: ${m.new>0?(m.cafe/m.new*100).toFixed(0):'-'}%（基準${goals.cafeRate}%）
+LP実施: ${m.lp}件  HB実施: ${m.hb}件
+P申込: ${m.contract}件 / 目標${goals.contract}件  P申込率: ${m.new>0?(m.contract/m.new*100).toFixed(1):'-'}%（基準${goals.contractRate}%）
+
+【今期累計（${today.getFullYear()}年1月〜）】
+新規: ${fy.new}件  カフェ: ${fy.cafe}件  P申込: ${fy.contract}件  P申込率: ${fy.new>0?(fy.contract/fy.new*100).toFixed(1):'-'}%
+
+【担当ADV別今期P申込（上位）】
+${advTop.map(d => `${d.name}: P申込${d.contract}件 / 新規${d.total}件 カフェ${d.cafe}件`).join('\n')}`;
+}
+function appendMsg(role, text) {
+  const el = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.textContent = text;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+  return div;
+}
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const key = localStorage.getItem(GEMINI_KEY_SK);
+  if (!key) { document.getElementById('chat-key-section').style.display = 'block'; return; }
+  input.value = '';
+  appendMsg('user', text);
+  const typing = appendMsg('typing', '考え中...');
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: buildGeminiContext() + '\n\n質問: ' + text }] }] })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    typing.className = 'chat-msg ai';
+    typing.textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '応答がありませんでした';
+  } catch(e) {
+    typing.className = 'chat-msg ai';
+    typing.textContent = `エラー: ${e.message}`;
+    document.getElementById('chat-key-section').style.display = 'block';
+  }
+}
+function onChatKeydown(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } }
 
 // ─────────────────────────────────────────────────────────────
 // UTILS
@@ -509,6 +919,7 @@ function getAdvRows() {
 }
 
 function applyFilters() {
+  checkAlerts();
   reRenderTab(currentTab);
 }
 
@@ -547,6 +958,8 @@ function reRenderTab(name) {
     const rows = getFilteredRows();
     renderForecast(rows);
     renderRecent(rows);
+  } else if (name === 'goals') {
+    renderGoalsTab();
   }
 }
 
@@ -1350,6 +1763,7 @@ async function init() {
     const rawRows = await fetchData();
     allValidRows = rawRows.filter(isValidCustomer);
     setupStaffMultiSelect(allValidRows);
+    checkAlerts();
     reRenderTab(currentTab);
     const now = new Date();
     document.getElementById('last-update').textContent =
@@ -1365,7 +1779,7 @@ async function init() {
 document.addEventListener('DOMContentLoaded', () => {
   setupFilters();
   init();
-  setInterval(init, 5 * 60 * 1000);
+  startAutoRefresh(); // 15分ごとに自動更新
 });
 </script>
 </body>
