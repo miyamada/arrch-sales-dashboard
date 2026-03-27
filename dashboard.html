@@ -1633,22 +1633,26 @@ function renderStaff(rows) {
     }
   });
 
-  document.getElementById('staff-tbody').innerHTML = sorted.map(([name, d]) => {
-    const rate = d.total > 0 ? (d.contract / d.total * 100).toFixed(1) : '0.0';
-    const rateClass = parseFloat(rate) >= 5 ? 'badge-green' : parseFloat(rate) >= 2 ? 'badge-yellow' : 'badge-red';
-    return `
-      <tr>
-        <td style="font-weight:600;">${name}</td>
-        <td>${d.total}</td><td>${d.zero}</td><td>${d.mtg}</td>
-        <td style="color:#6b6b6b;font-weight:600;">${d.cafe}</td>
-        <td style="color:#c9805a;font-weight:600;">${d.lp}</td>
-        <td style="color:#d4480a;font-weight:600;">${d.hb}</td>
-        <td>${d.shikin}</td>
-        <td style="color:#e85d26;font-weight:700;">${d.contract}</td>
-        <td><span class="badge ${rateClass}">${rate}%</span></td>
-      </tr>
-    `;
-  }).join('') || '<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:20px;">データなし</td></tr>';
+  // staff-tbody は renderAdvActivity が担当するため、存在する場合のみ更新
+  const staffTbody = document.getElementById('staff-tbody');
+  if (staffTbody) {
+    staffTbody.innerHTML = sorted.map(([name, d]) => {
+      const rate = d.total > 0 ? (d.contract / d.total * 100).toFixed(1) : '0.0';
+      const rateClass = parseFloat(rate) >= 5 ? 'badge-green' : parseFloat(rate) >= 2 ? 'badge-yellow' : 'badge-red';
+      return `
+        <tr>
+          <td style="font-weight:600;">${name}</td>
+          <td>${d.total}</td><td>${d.zero}</td><td>${d.mtg}</td>
+          <td style="color:#6b6b6b;font-weight:600;">${d.cafe}</td>
+          <td style="color:#c9805a;font-weight:600;">${d.lp}</td>
+          <td style="color:#d4480a;font-weight:600;">${d.hb}</td>
+          <td>${d.shikin}</td>
+          <td style="color:#e85d26;font-weight:700;">${d.contract}</td>
+          <td><span class="badge ${rateClass}">${rate}%</span></td>
+        </tr>
+      `;
+    }).join('') || '<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:20px;">データなし</td></tr>';
+  }
 }
 
 function renderRanking(rows) {
