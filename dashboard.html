@@ -468,10 +468,13 @@
       <span style="font-size:18px;">🤖</span>
       <div>
         <div style="font-size:13px; font-weight:700;">AI営業アシスタント</div>
-        <div style="font-size:10px; color:rgba(255,255,255,.45);">Powered by Gemini</div>
+        <div style="font-size:10px; color:rgba(255,255,255,.45);">Powered by <span id="chat-model-label">Gemini</span></div>
       </div>
     </div>
-    <button onclick="toggleChat()" style="background:none; border:none; color:rgba(255,255,255,.5); cursor:pointer; font-size:18px; line-height:1;">✕</button>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <button onclick="resetChat()" title="会話をリセット" style="background:rgba(255,255,255,.12); border:none; color:rgba(255,255,255,.7); cursor:pointer; font-size:11px; padding:3px 8px; border-radius:6px; line-height:1.4;">↺ リセット</button>
+      <button onclick="toggleChat()" style="background:none; border:none; color:rgba(255,255,255,.5); cursor:pointer; font-size:18px; line-height:1;">✕</button>
+    </div>
   </div>
   <div id="chat-key-section" class="chat-key-wrap" style="display:none;">
     <p style="font-size:11px; color:#6b7280; margin-bottom:6px;">Gemini APIキーを入力（一度入力すれば保存されます）</p>
@@ -712,6 +715,8 @@ function checkAlerts() {
 // FEATURE 4: GEMINI AI CHAT
 // ─────────────────────────────────────────────────────────────
 const GEMINI_KEY_SK = 'arrch_gemini_key';
+let chatHistory = []; // multi-turn conversation history
+
 function toggleChat() {
   const panel = document.getElementById('chat-panel');
   const hasKey = !!localStorage.getItem(GEMINI_KEY_SK);
@@ -722,8 +727,29 @@ function saveGeminiKey() {
   const k = document.getElementById('gemini-key-input').value.trim();
   if (!k) return;
   localStorage.setItem(GEMINI_KEY_SK, k);
+  // 古いモデルキャッシュもクリアして再検出させる
+  localStorage.removeItem('arrch_gemini_model');
+  localStorage.removeItem('arrch_gemini_model_v2');
   document.getElementById('chat-key-section').style.display = 'none';
   appendMsg('ai', 'APIキーを保存しました！何でも質問してください 🎉');
+}
+function resetChat() {
+  chatHistory = [];
+  const el = document.getElementById('chat-messages');
+  el.innerHTML = '<div class="chat-msg ai">会話をリセットしました。新しい質問をどうぞ！<br><br>例：「今月の成績を分析して」「歩留まりを改善するには？」「来月の予測は？」</div>';
+}
+// Markdownのシンプルレンダリング
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^### (.+)$/gm,'<strong style="font-size:13px;display:block;margin-top:8px;margin-bottom:2px;">$1</strong>')
+    .replace(/^## (.+)$/gm,'<strong style="font-size:14px;display:block;margin-top:10px;margin-bottom:3px;">$1</strong>')
+    .replace(/^# (.+)$/gm,'<strong style="font-size:15px;display:block;margin-top:10px;margin-bottom:4px;">$1</strong>')
+    .replace(/^[\-\*] (.+)$/gm,'<div style="padding-left:14px;position:relative;"><span style="position:absolute;left:4px;">•</span>$1</div>')
+    .replace(/^(\d+)\. (.+)$/gm,'<div style="padding-left:20px;position:relative;"><span style="position:absolute;left:4px;">$1.</span>$2</div>')
+    .replace(/\n/g,'<br>');
 }
 function buildGeminiContext() {
   const base = getAdvRows();
@@ -756,7 +782,11 @@ function appendMsg(role, text) {
   const el = document.getElementById('chat-messages');
   const div = document.createElement('div');
   div.className = `chat-msg ${role}`;
-  div.textContent = text;
+  if (role === 'ai') {
+    div.innerHTML = renderMarkdown(text);
+  } else {
+    div.textContent = text;
+  }
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
   return div;
@@ -792,14 +822,44 @@ async function sendChat() {
   const typing = appendMsg('typing', '考え中...');
   try {
     const model = await detectGeminiModel(key);
+    // モデル名をヘッダーに表示
+    const modelEl = document.getElementById('chat-model-label');
+    if (modelEl) modelEl.textContent = model;
+
+    // システムコンテキストを最初のメッセージに埋め込む
+    const systemCtx = buildGeminiContext();
+    let contents;
+    if (chatHistory.length === 0) {
+      // 初回: システムコンテキスト付き
+      contents = [
+        { role: 'user', parts: [{ text: systemCtx + '\n\n質問: ' + text }] }
+      ];
+    } else {
+      // 2回目以降: 履歴をそのまま + 新しいメッセージ
+      contents = [
+        { role: 'user', parts: [{ text: systemCtx }] },
+        { role: 'model', parts: [{ text: 'データを受け取りました。何でも聞いてください。' }] },
+        ...chatHistory,
+        { role: 'user', parts: [{ text }] }
+      ];
+    }
+
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: buildGeminiContext() + '\n\n質問: ' + text }] }] })
+      body: JSON.stringify({ contents })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '応答がありませんでした';
+
+    // 会話履歴に追加
+    chatHistory.push({ role: 'user', parts: [{ text }] });
+    chatHistory.push({ role: 'model', parts: [{ text: reply }] });
+    // 履歴が長くなりすぎないよう直近10ターンまで
+    if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
     typing.className = 'chat-msg ai';
-    typing.textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '応答がありませんでした';
+    typing.innerHTML = renderMarkdown(reply);
   } catch(e) {
     localStorage.removeItem('arrch_gemini_model');
     localStorage.removeItem('arrch_gemini_model_v2');
