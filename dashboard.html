@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>営業ダッシュボード | ARRCH住宅事業</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #f5f3f0; }
+
+    #loading {
+      position: fixed; inset: 0;
+      background: rgba(245,243,240,0.92);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999; gap: 12px;
+      transition: opacity 0.3s;
+    }
+    #loading.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid #e5e0d8;
+      border-top-color: #1a1a1a;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .card { background: #fff; border-radius: 14px; box-shadow: 0 1px 6px rgba(0,0,0,.07); padding: 20px; }
+    .sec-title { font-size: 11px; font-weight: 700; color: #9ca3af; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
+
+    .preset-btn {
+      padding: 4px 12px; font-size: 12px; font-weight: 600; border-radius: 8px;
+      cursor: pointer; transition: all .15s;
+      border: none; background: rgba(255,255,255,.12); color: rgba(255,255,255,.7);
+    }
+    .preset-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+    .preset-btn.active { background: #fff; color: #1a1a1a; }
+
+    .filter-input {
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
+      color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 12px;
+    }
+    .filter-input::placeholder { color: rgba(255,255,255,.4); }
+    .filter-input::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.5); }
+
+    .dtable { width: 100%; font-size: 13px; border-collapse: collapse; }
+    .dtable th { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; padding: 8px 12px; border-bottom: 2px solid #f0ece7; text-align: left; white-space: nowrap; }
+    .dtable td { padding: 8px 12px; border-bottom: 1px solid #f0ece7; white-space: nowrap; }
+    .dtable tbody tr:hover td { background: #faf6f2; }
+    .dtable tbody tr:last-child td { border-bottom: none; }
+
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+
+    .kpi-card { background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 6px rgba(0,0,0,.07); }
+
+    .stage-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-size: 11px; font-weight: 600;
+    }
+
+    /* Multi-select staff dropdown */
+    #staff-dropdown-menu {
+      display: none; position: absolute; top: calc(100% + 6px); right: 0;
+      background: #fff; border: 1px solid #e5e0d8; border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.15); min-width: 180px; z-index: 500;
+    }
+    .staff-check-label {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; color: #1a1a1a; transition: background .1s;
+    }
+    .staff-check-label:hover { background: #f5f3f0; }
+    .staff-check-label input[type=checkbox] { accent-color: #e85d26; cursor: pointer; }
+    #staff-all-label { background: #f5f3f0; font-weight: 700; margin-bottom: 2px; }
+    .staff-list-divider { height: 1px; background: #f0ece7; margin: 4px 0; }
+    #staff-checkbox-list { max-height: 220px; overflow-y: auto; }
+
+    /* Tab navigation */
+    .tab-nav {
+      display: flex; gap: 2px;
+      background: rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 3px;
+    }
+    .tab-btn {
+      padding: 6px 18px; font-size: 13px; font-weight: 600;
+      border-radius: 8px; cursor: pointer; border: none;
+      color: rgba(255,255,255,.6);
+      background: transparent;
+      transition: all .15s; white-space: nowrap;
+    }
+    .tab-btn:hover { color: #fff; background: rgba(255,255,255,.1); }
+    .tab-btn.active { background: #fff; color: #1a1a1a; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: flex; flex-direction: column; gap: 20px; }
+
+    /* KPI main card (large) */
+    .kpi-main-card {
+      background: #fff; border-radius: 14px; padding: 22px 24px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.07);
+    }
+    .kpi-main-card .kpi-value { font-size: 42px; font-weight: 800; line-height: 1; }
+    .kpi-main-card .kpi-label { font-size: 11px; font-weight: 700; color: #9ca3af; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+    .kpi-main-card .kpi-sub { font-size: 11px; color: #c4b9a8; margin-top: 6px; }
+
+    /* KPI mid card */
+    .kpi-mid-card {
+      background: #fff; border-radius: 14px; padding: 16px 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.07);
+    }
+    .kpi-mid-card .kpi-value { font-size: 30px; font-weight: 800; line-height: 1; }
+    .kpi-mid-card .kpi-label { font-size: 10px; font-weight: 700; color: #9ca3af; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 6px; }
+    .kpi-mid-card .kpi-sub { font-size: 11px; color: #c4b9a8; margin-top: 4px; }
+
+    /* Comparison badge */
+    .cmp-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700;
+    }
+    .cmp-up { background: #dcfce7; color: #166534; }
+    .cmp-down { background: #fee2e2; color: #991b1b; }
+    .cmp-neutral { background: #f3f4f6; color: #6b7280; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- Loading Overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="font-size:13px;color:#6b7280;">データを読み込み中...</p>
+</div>
+
+<!-- Error Banner -->
+<div id="error-banner" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:999;background:#fef2f2;border-bottom:2px solid #fca5a5;padding:10px 20px;font-size:13px;color:#991b1b;">
+  <span id="error-msg"></span>
+  <button onclick="init()" style="margin-left:12px;text-decoration:underline;cursor:pointer;">再試行</button>
+</div>
+
+<!-- Header -->
+<header style="background:#0f0f0f; position:sticky; top:0; z-index:100; box-shadow:0 2px 12px rgba(0,0,0,.3);">
+  <div style="max-width:1600px; margin:0 auto; padding:10px 20px;">
+    <!-- Title + Tab row -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span style="font-size:13px; font-weight:800; color:#e85d26; letter-spacing:.12em; text-transform:uppercase;">ARRCH</span>
+        <span style="color:rgba(255,255,255,.2); font-size:16px;">|</span>
+        <h1 style="font-size:14px; font-weight:700; color:#fff; letter-spacing:.01em;">住宅事業 営業ダッシュボード</h1>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <!-- Tab navigation -->
+        <nav class="tab-nav">
+          <button class="tab-btn active" data-tab="summary">📊 サマリー</button>
+          <button class="tab-btn" data-tab="funnel">📈 ファネル</button>
+          <button class="tab-btn" data-tab="team">👥 チーム</button>
+          <button class="tab-btn" data-tab="predict">🎯 予測</button>
+        </nav>
+        <span id="last-update" style="font-size:11px; color:#6b6b6b;">-</span>
+        <button onclick="init()" style="background:#e85d26; color:#fff; border:none; padding:5px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;" onmouseover="this.style.background='#d4480a'" onmouseout="this.style.background='#e85d26'">↻ 更新</button>
+      </div>
+    </div>
+    <!-- Filter row -->
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+      <div style="display:flex; gap:4px;" id="period-filter-wrap">
+        <button class="preset-btn" data-preset="month">今月</button>
+        <button class="preset-btn" data-preset="lastmonth">先月</button>
+        <button class="preset-btn" data-preset="quarter">今四半期</button>
+        <button class="preset-btn active" data-preset="all">全期間</button>
+      </div>
+      <span style="color:rgba(255,255,255,.2); font-size:13px;" id="period-filter-sep">|</span>
+      <input type="date" id="filter-start" class="filter-input" title="開始日">
+      <span style="color:#6b6b6b; font-size:13px;">〜</span>
+      <input type="date" id="filter-end" class="filter-input" title="終了日">
+      <span style="color:rgba(255,255,255,.2); font-size:13px;">|</span>
+      <!-- Multi-select ADV dropdown -->
+      <div id="staff-dropdown-wrap" style="position:relative;">
+        <button id="staff-dropdown-btn" onclick="toggleStaffDropdown(event)"
+          style="background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); color:#fff; padding:4px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+          <span id="staff-btn-label">全担当ADV</span>
+          <span style="font-size:10px; opacity:.7;">▾</span>
+        </button>
+        <div id="staff-dropdown-menu">
+          <div style="padding:8px;">
+            <label class="staff-check-label" id="staff-all-label">
+              <input type="checkbox" id="staff-all-check" onchange="onAllStaffChange()" checked> 全員
+            </label>
+            <div class="staff-list-divider"></div>
+            <div id="staff-checkbox-list"></div>
+          </div>
+        </div>
+      </div>
+      <span id="filter-note" style="font-size:11px; color:#e85d26; display:none;">※ サマリーは今期固定表示</span>
+    </div>
+  </div>
+</header>
+
+<!-- Main -->
+<main style="max-width:1600px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:20px;">
+
+  <!-- ════════════════════════════════════════════════════
+       TAB 1: サマリー
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-summary" class="tab-panel active">
+
+    <!-- FY notice -->
+    <div style="background:#fff; border-radius:10px; padding:10px 16px; display:flex; align-items:center; gap:8px; box-shadow:0 1px 4px rgba(0,0,0,.06);">
+      <span style="color:#e85d26; font-size:14px;">📅</span>
+      <span id="fy-label" style="font-size:12px; font-weight:700; color:#1a1a1a;"></span>
+      <span style="font-size:12px; color:#9ca3af;">| 期間フィルターは今期KPIに影響しません。担当ADVフィルターは反映されます。</span>
+    </div>
+
+    <!-- 成果KPI 大カード -->
+    <div>
+      <p class="sec-title" style="margin-bottom:10px;">今期 成果指標</p>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;" id="summary-outcome"></div>
+    </div>
+
+    <!-- 活動量KPI 中カード -->
+    <div>
+      <p class="sec-title" style="margin-bottom:10px;">活動量指標</p>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px;" id="summary-activity"></div>
+    </div>
+
+    <!-- パイプラインKPI 中カード -->
+    <div>
+      <p class="sec-title" style="margin-bottom:10px;">パイプライン＆健全性</p>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px;" id="summary-pipeline"></div>
+    </div>
+
+    <!-- 月別推移 (always all data) -->
+    <div class="card">
+      <p class="sec-title">月別推移（行動量）</p>
+      <canvas id="monthlyChart"></canvas>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════
+       TAB 2: ファネル
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-funnel" class="tab-panel">
+
+    <!-- Conversion rate badges -->
+    <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:10px;" id="conv-rates"></div>
+
+    <!-- Funnel chart + LT -->
+    <div class="card">
+      <p class="sec-title">営業ファネル（フィルター適用）</p>
+      <canvas id="funnelChart"></canvas>
+      <div id="funnel-lt" style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px;"></div>
+    </div>
+
+    <!-- Model house -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div class="card">
+        <p class="sec-title">モデルハウス別 顧客分布</p>
+        <div style="display:flex; align-items:center; justify-content:center; padding:10px 0;">
+          <canvas id="modelChart" style="max-height:280px;"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <p class="sec-title">ステージ別 前月比</p>
+        <canvas id="stageCmpChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════
+       TAB 3: チーム
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-team" class="tab-panel">
+
+    <!-- 期間内活動実績テーブル (activity-date filtered) -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <p class="sec-title" style="margin-bottom:0;">担当ADV別 期間内活動実績</p>
+        <span style="font-size:11px; color:#9ca3af;">各実施日ベース集計 | 期間フィルター適用</span>
+      </div>
+      <div id="adv-activity-table"></div>
+    </div>
+
+    <!-- 歩留まり率テーブル (2列: フィルター期間コホート vs 全期間) -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <p class="sec-title" style="margin-bottom:0;">担当ADV別 歩留まり率</p>
+        <span style="font-size:11px; color:#9ca3af;">初接触起点コホート</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div>
+          <p style="font-size:11px; font-weight:700; color:#e85d26; margin-bottom:8px; padding:6px 10px; background:#fff3ed; border-radius:6px; display:inline-block;">📅 フィルター期間（初接触日ベース）</p>
+          <div id="adv-yield-filtered"></div>
+        </div>
+        <div>
+          <p style="font-size:11px; font-weight:700; color:#6b6b6b; margin-bottom:8px; padding:6px 10px; background:#f5f3f0; border-radius:6px; display:inline-block;">📊 全期間累計</p>
+          <div id="adv-yield-all"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADV Chart -->
+    <div class="card">
+      <p class="sec-title">担当ADV別実績グラフ</p>
+      <canvas id="staffChart"></canvas>
+    </div>
+
+    <!-- Rankings -->
+    <section style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div class="card">
+        <p class="sec-title">受注ランキング（P申込数）</p>
+        <div id="contract-ranking"></div>
+      </div>
+      <div class="card">
+        <p class="sec-title">リードタイム優秀者（カフェ→成約 平均日数）</p>
+        <div id="lt-ranking"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════
+       TAB 4: 予測
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-predict" class="tab-panel">
+
+    <!-- Forecast KPIs -->
+    <div id="forecast-section"></div>
+
+    <!-- Recent contacts -->
+    <div class="card">
+      <p class="sec-title">最新接触リスト（直近10件）</p>
+      <div style="overflow-x:auto;">
+        <table class="dtable">
+          <thead>
+            <tr>
+              <th>初接触日</th><th>顧客名</th><th>担当ADV</th><th>モデルハウス</th><th>現在ステージ</th>
+            </tr>
+          </thead>
+          <tbody id="recent-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwQ3oP_O8giT2yA7n1-GwwW3NIX8zhAv1Mv3I693dlliacJAM1SLVLyP6UDS8RMKKIn/exec';
+
+const C = {
+  FIRST_CONTACT: 0, NAME: 1, FIRST_STAFF: 2, ADV: 3,
+  ZERO_STAGE: 4, FIRST_MTG: 5, MODEL_HOUSE: 6, INVALID: 7,
+  CAFE_DATE: 14, CAFE_CANCEL: 15, CAFE_LT: 16,
+  LP_DATE: 24, LP_LT: 27, HB_DATE: 29, HB_LT: 32,
+  SHIKIN_DATE: 34, CL_LT: 37, CONTRACT: 43,
+};
+
+const CHART_COLORS = [
+  '#1a1a1a','#e85d26','#c9805a','#6b6b6b','#d4480a',
+  '#4a4a4a','#f0a070','#c4b9a8',
+];
+
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+let allValidRows = [];
+let charts = {};
+let currentTab = 'summary';
+const filterState = { start: null, end: null, staffList: [] };
+
+// ─────────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────────
+function getCell(row, i) {
+  if (!row || i >= row.length) return null;
+  const v = row[i];
+  if (v === null || v === undefined || v === '') return null;
+  return { v };
+}
+function getVal(row, i) {
+  const c = getCell(row, i); return c ? c.v : null;
+}
+function parseGvizDate(cell) {
+  if (!cell || cell.v == null || cell.v === '') return null;
+  const v = cell.v;
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+    const [y,m,d] = v.slice(0,10).split('-');
+    return new Date(+y, +m-1, +d);
+  }
+  if (typeof v === 'string' && /^\d{4}\/\d{2}\/\d{2}/.test(v)) {
+    const [y,m,d] = v.slice(0,10).split('/');
+    return new Date(+y, +m-1, +d);
+  }
+  return null;
+}
+function formatDate(date) {
+  if (!date) return '-';
+  return `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`;
+}
+function monthKey(date) {
+  if (!date) return null;
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+}
+function isValidCustomer(row) {
+  const name = getVal(row, C.NAME);
+  if (!name || String(name).trim() === '') return false;
+  const inv = getVal(row, C.INVALID);
+  if (inv !== null && inv !== undefined && inv !== '' && inv !== false && inv !== 0) return false;
+  return true;
+}
+function createChart(id, config) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  charts[id] = new Chart(canvas, config);
+}
+function getCurrentStage(row) {
+  const stages = [
+    { col: C.CONTRACT,    label: '成約',    color: '#e85d26' },
+    { col: C.SHIKIN_DATE, label: '資金計画', color: '#d4480a' },
+    { col: C.HB_DATE,     label: 'HB実施',  color: '#c9805a' },
+    { col: C.LP_DATE,     label: 'LP実施',  color: '#a07850' },
+    { col: C.CAFE_DATE,   label: 'カフェ実施', color: '#6b6b6b' },
+    { col: C.FIRST_MTG,   label: '第1面談', color: '#4a4a4a' },
+    { col: C.ZERO_STAGE,  label: '0次接客', color: '#2d2d2d' },
+    { col: C.FIRST_CONTACT, label: '新規接触', color: '#1a1a1a' },
+  ];
+  for (const s of stages) {
+    if (parseGvizDate(getCell(row, s.col))) return s;
+  }
+  return { label: '-', color: '#9ca3af' };
+}
+
+// ─────────────────────────────────────────────────────────────
+// FISCAL YEAR HELPERS (12月決算: Jan 1 – Dec 31)
+// ─────────────────────────────────────────────────────────────
+function fyBounds(year) {
+  return {
+    start: new Date(year, 0, 1),
+    end:   new Date(year, 11, 31, 23, 59, 59),
+    upTo:  new Date(year, new Date().getMonth(), new Date().getDate(), 23, 59, 59),
+  };
+}
+function monthBounds(year, month) { // month: 0-based
+  return {
+    start: new Date(year, month, 1),
+    end:   new Date(year, month+1, 0, 23, 59, 59),
+  };
+}
+// Count rows where col date is within [start, end]
+function countInRange(rows, col, start, end) {
+  return rows.filter(r => {
+    const d = parseGvizDate(getCell(r, col));
+    if (!d) return false;
+    if (start && d < start) return false;
+    if (end   && d > end)   return false;
+    return true;
+  }).length;
+}
+// Comparison badge HTML
+function cmpBadge(current, prev, unit, lowerIsBetter) {
+  if (prev === null || prev === undefined) return '';
+  const diff = current - prev;
+  const pct  = prev > 0 ? Math.abs((diff / prev * 100)).toFixed(0) : null;
+  const pctStr = pct !== null ? ` (${pct}%)` : '';
+  if (diff === 0) return `<span class="cmp-badge cmp-neutral">→ 前期同数</span>`;
+  const isGood = lowerIsBetter ? diff < 0 : diff > 0;
+  const cls = isGood ? 'cmp-up' : 'cmp-down';
+  const arrow = diff > 0 ? '▲' : '▼';
+  return `<span class="cmp-badge ${cls}">${arrow} ${Math.abs(diff)}${unit}${pctStr}</span>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DATA FETCH
+// ─────────────────────────────────────────────────────────────
+async function fetchData() {
+  const res = await fetch(GAS_URL);
+  if (!res.ok) throw new Error(`HTTPエラー: ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json.rows || [];
+}
+
+// ─────────────────────────────────────────────────────────────
+// FILTER
+// ─────────────────────────────────────────────────────────────
+function getFilteredRows() {
+  return allValidRows.filter(row => {
+    const d = parseGvizDate(getCell(row, C.FIRST_CONTACT));
+    if (filterState.start && d && d < filterState.start) return false;
+    if (filterState.end   && d && d > filterState.end)   return false;
+    if (filterState.staffList.length > 0 && !filterState.staffList.includes(getVal(row, C.ADV))) return false;
+    return true;
+  });
+}
+// ADV filter only (no period filter) – for summary tab
+function getAdvRows() {
+  if (filterState.staffList.length === 0) return allValidRows;
+  return allValidRows.filter(row => filterState.staffList.includes(getVal(row, C.ADV)));
+}
+
+function applyFilters() {
+  reRenderTab(currentTab);
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB SWITCHING
+// ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+
+  // Period filter hint
+  const note = document.getElementById('filter-note');
+  note.style.display = name === 'summary' ? 'inline' : 'none';
+
+  requestAnimationFrame(() => reRenderTab(name));
+}
+
+function reRenderTab(name) {
+  if (name === 'summary') {
+    renderSummary();
+    renderMonthly(getAdvRows());
+  } else if (name === 'funnel') {
+    const rows = getFilteredRows();
+    renderConvRates(rows);
+    renderFunnel(rows);
+    renderModelHouse(rows);
+    renderStageCmp(rows);
+  } else if (name === 'team') {
+    const rows = getFilteredRows();
+    renderAdvActivity();
+    renderAdvYield();
+    renderStaff(rows);
+    renderRanking(rows);
+  } else if (name === 'predict') {
+    const rows = getFilteredRows();
+    renderForecast(rows);
+    renderRecent(rows);
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ─────────────────────────────────────────────────────────────
+// MULTI-SELECT STAFF FILTER
+// ─────────────────────────────────────────────────────────────
+function toggleStaffDropdown(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('staff-dropdown-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', () => {
+  const menu = document.getElementById('staff-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+});
+function updateStaffBtnLabel() {
+  const checkboxes = [...document.querySelectorAll('.staff-check')];
+  const allCheck = document.getElementById('staff-all-check');
+  const selected = checkboxes.filter(cb => cb.checked).map(cb => cb.value);
+  const total = checkboxes.length;
+  if (selected.length === 0 || selected.length === total) {
+    filterState.staffList = []; allCheck.checked = true; allCheck.indeterminate = false;
+    document.getElementById('staff-btn-label').textContent = '全担当ADV';
+  } else {
+    filterState.staffList = selected; allCheck.checked = false; allCheck.indeterminate = true;
+    document.getElementById('staff-btn-label').textContent = `${selected.length}名選択`;
+  }
+  applyFilters();
+}
+function onAllStaffChange() {
+  const allCheck = document.getElementById('staff-all-check');
+  document.querySelectorAll('.staff-check').forEach(cb => cb.checked = allCheck.checked);
+  filterState.staffList = []; allCheck.indeterminate = false;
+  document.getElementById('staff-btn-label').textContent = allCheck.checked ? '全担当ADV' : '0名選択';
+  applyFilters();
+}
+function setupStaffMultiSelect(rows) {
+  const staffSet = new Set(rows.map(r => getVal(r, C.ADV)).filter(Boolean));
+  const list = document.getElementById('staff-checkbox-list');
+  list.innerHTML = [...staffSet].sort().map(name => `
+    <label class="staff-check-label">
+      <input type="checkbox" class="staff-check" value="${name}" checked onchange="updateStaffBtnLabel()">
+      ${name}
+    </label>
+  `).join('');
+  document.getElementById('staff-all-check').checked = true;
+  document.getElementById('staff-all-check').indeterminate = false;
+  filterState.staffList = [];
+  document.getElementById('staff-btn-label').textContent = '全担当ADV';
+}
+
+function setupFilters() {
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const now = new Date();
+      const start = document.getElementById('filter-start');
+      const end   = document.getElementById('filter-end');
+      const preset = btn.dataset.preset;
+      if (preset === 'month') {
+        const s = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.value = s.toISOString().slice(0,10); end.value = now.toISOString().slice(0,10);
+        filterState.start = s; filterState.end = now;
+      } else if (preset === 'lastmonth') {
+        const s = new Date(now.getFullYear(), now.getMonth()-1, 1);
+        const e = new Date(now.getFullYear(), now.getMonth(), 0);
+        start.value = s.toISOString().slice(0,10); end.value = e.toISOString().slice(0,10);
+        filterState.start = s; filterState.end = e;
+      } else if (preset === 'quarter') {
+        const qS = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
+        start.value = qS.toISOString().slice(0,10); end.value = now.toISOString().slice(0,10);
+        filterState.start = qS; filterState.end = now;
+      } else {
+        start.value = ''; end.value = '';
+        filterState.start = null; filterState.end = null;
+      }
+      applyFilters();
+    });
+  });
+  document.getElementById('filter-start').addEventListener('change', e => {
+    filterState.start = e.target.value ? new Date(e.target.value) : null;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    applyFilters();
+  });
+  document.getElementById('filter-end').addEventListener('change', e => {
+    filterState.end = e.target.value ? new Date(e.target.value + 'T23:59:59') : null;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    applyFilters();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB 1: SUMMARY
+// ─────────────────────────────────────────────────────────────
+function renderSummary() {
+  const now   = new Date();
+  const year  = now.getFullYear();
+  const prevY = year - 1;
+  const fy    = fyBounds(year);
+  const fyP   = fyBounds(prevY);
+  const thisM = monthBounds(year, now.getMonth());
+  const lastM = monthBounds(year, now.getMonth() - 1);
+
+  // ADV filter only rows
+  const base = getAdvRows();
+
+  // ── 成果指標 ──────────────────────────────────────────────
+  // 1. 今期P申込累計（P申込日ベース）
+  const fyContract     = countInRange(base, C.CONTRACT, fy.start, fy.upTo);
+  // 前期同期比（前年同期＝1月1日〜今日相当）
+  const prevSameDay    = new Date(prevY, now.getMonth(), now.getDate(), 23, 59, 59);
+  const fyPContract    = countInRange(base, C.CONTRACT, fyP.start, prevSameDay);
+
+  // 2. 今期P申込取得率（有効顧客のうちP申込あり、今期初接触）
+  const fyNewRows      = base.filter(r => { const d = parseGvizDate(getCell(r, C.FIRST_CONTACT)); return d && d >= fy.start && d <= fy.upTo; });
+  const fyNewP         = fyNewRows.filter(r => parseGvizDate(getCell(r, C.CONTRACT))).length;
+  const fyRate         = fyNewRows.length > 0 ? (fyNewP / fyNewRows.length * 100).toFixed(1) : '0.0';
+  const prevFyNewRows  = base.filter(r => { const d = parseGvizDate(getCell(r, C.FIRST_CONTACT)); return d && d >= fyP.start && d <= fyP.end; });
+  const prevFyNewP     = prevFyNewRows.filter(r => parseGvizDate(getCell(r, C.CONTRACT))).length;
+  const prevFyRate     = prevFyNewRows.length > 0 ? (prevFyNewP / prevFyNewRows.length * 100).toFixed(1) : null;
+
+  // 3. 今月 vs 先月 新規接触
+  const thisMonthNew   = countInRange(base, C.FIRST_CONTACT, thisM.start, thisM.end);
+  const lastMonthNew   = countInRange(base, C.FIRST_CONTACT, lastM.start, lastM.end);
+
+  document.getElementById('fy-label').textContent =
+    `${year}年度（${year}/01/01 〜 ${year}/12/31）`;
+
+  document.getElementById('summary-outcome').innerHTML = `
+    <div class="kpi-main-card" style="border-top:4px solid #e85d26;">
+      <p class="kpi-label">今期 P申込累計</p>
+      <p class="kpi-value" style="color:#e85d26;">${fyContract}<span style="font-size:20px;font-weight:600;color:#9ca3af;margin-left:4px;">件</span></p>
+      <p class="kpi-sub">
+        前期同期 ${fyPContract}件 &nbsp; ${cmpBadge(fyContract, fyPContract, '件', false)}
+      </p>
+    </div>
+    <div class="kpi-main-card" style="border-top:4px solid #d4480a;">
+      <p class="kpi-label">今期 P申込取得率</p>
+      <p class="kpi-value" style="color:#d4480a;">${fyRate}<span style="font-size:20px;font-weight:600;color:#9ca3af;margin-left:4px;">%</span></p>
+      <p class="kpi-sub">
+        今期新規 ${fyNewRows.length}名中 ${fyNewP}件
+        &nbsp; ${prevFyRate !== null ? `前期 ${prevFyRate}%` : '前期データなし'}
+        &nbsp; ${cmpBadge(parseFloat(fyRate), prevFyRate !== null ? parseFloat(prevFyRate) : null, 'pt', false)}
+      </p>
+    </div>
+    <div class="kpi-main-card" style="border-top:4px solid #1a1a1a;">
+      <p class="kpi-label">今月 新規接触</p>
+      <p class="kpi-value" style="color:#1a1a1a;">${thisMonthNew}<span style="font-size:20px;font-weight:600;color:#9ca3af;margin-left:4px;">名</span></p>
+      <p class="kpi-sub">
+        先月 ${lastMonthNew}名 &nbsp; ${cmpBadge(thisMonthNew, lastMonthNew, '名', false)}
+      </p>
+    </div>
+  `;
+
+  // ── 活動量指標 ───────────────────────────────────────────
+  // 今期カフェ実施数
+  const fyCafe    = countInRange(base, C.CAFE_DATE, fy.start, fy.upTo);
+  const prevFyCafe= countInRange(base, C.CAFE_DATE, fyP.start, prevSameDay);
+  // 今期LP
+  const fyLP      = countInRange(base, C.LP_DATE, fy.start, fy.upTo);
+  const prevFyLP  = countInRange(base, C.LP_DATE, fyP.start, prevSameDay);
+  // 今期HB
+  const fyHB      = countInRange(base, C.HB_DATE, fy.start, fy.upTo);
+  // 今期新規接触累計
+  const fyNew     = countInRange(base, C.FIRST_CONTACT, fy.start, fy.upTo);
+  const prevFyNew = countInRange(base, C.FIRST_CONTACT, fyP.start, prevSameDay);
+
+  document.getElementById('summary-activity').innerHTML = [
+    { label: '今期 新規接触累計', val: fyNew, unit: '名', prev: prevFyNew, prevLabel: `前期同期 ${prevFyNew}名`, color: '#4a4a4a' },
+    { label: '今期 カフェ実施数',  val: fyCafe, unit: '件', prev: prevFyCafe, prevLabel: `前期同期 ${prevFyCafe}件`, color: '#6b6b6b' },
+    { label: '今期 LP実施数',      val: fyLP,   unit: '件', prev: prevFyLP,  prevLabel: `前期同期 ${prevFyLP}件`,  color: '#c9805a' },
+    { label: '今期 HB実施数',      val: fyHB,   unit: '件', prev: null,      prevLabel: `${year}年累計`,           color: '#d4480a' },
+  ].map(item => `
+    <div class="kpi-mid-card" style="border-top:3px solid ${item.color};">
+      <p class="kpi-label">${item.label}</p>
+      <p class="kpi-value" style="color:${item.color};">${item.val}<span style="font-size:15px;font-weight:600;color:#9ca3af;margin-left:3px;">${item.unit}</span></p>
+      <p class="kpi-sub">${item.prevLabel} &nbsp; ${cmpBadge(item.val, item.prev, item.unit, false)}</p>
+    </div>
+  `).join('');
+
+  // ── パイプライン＆健全性 ─────────────────────────────────
+  // カフェ滞留中（成約未）
+  const cafeInProg = base.filter(r => parseGvizDate(getCell(r, C.CAFE_DATE)) && !parseGvizDate(getCell(r, C.CONTRACT))).length;
+  // LP滞留中
+  const lpInProg   = base.filter(r => parseGvizDate(getCell(r, C.LP_DATE))   && !parseGvizDate(getCell(r, C.CONTRACT))).length;
+  // HB滞留中
+  const hbInProg   = base.filter(r => parseGvizDate(getCell(r, C.HB_DATE))   && !parseGvizDate(getCell(r, C.CONTRACT))).length;
+  // 全期間カフェ実施率
+  const totalBase  = base.length;
+  const cafeTotal  = base.filter(r => parseGvizDate(getCell(r, C.CAFE_DATE))).length;
+  const cafeRate   = totalBase > 0 ? (cafeTotal / totalBase * 100).toFixed(1) : '0.0';
+
+  document.getElementById('summary-pipeline').innerHTML = [
+    { label: 'カフェ滞留中（未成約）', val: cafeInProg, unit: '名', sub: 'カフェ以降パイプライン', color: '#6b6b6b' },
+    { label: 'LP滞留中（未成約）',     val: lpInProg,   unit: '名', sub: 'LP以降パイプライン',   color: '#c9805a' },
+    { label: 'HB滞留中（未成約）',     val: hbInProg,   unit: '名', sub: 'HB以降パイプライン（高確度）', color: '#d4480a' },
+    { label: '全期間 カフェ実施率',    val: cafeRate,   unit: '%',  sub: `${cafeTotal}名 / ${totalBase}名`,           color: '#e85d26' },
+  ].map(item => `
+    <div class="kpi-mid-card" style="border-top:3px solid ${item.color};">
+      <p class="kpi-label">${item.label}</p>
+      <p class="kpi-value" style="color:${item.color};">${item.val}<span style="font-size:15px;font-weight:600;color:#9ca3af;margin-left:3px;">${item.unit}</span></p>
+      <p class="kpi-sub">${item.sub}</p>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB 2: FUNNEL
+// ─────────────────────────────────────────────────────────────
+function renderConvRates(rows) {
+  const stages = [
+    { label: '新規接触',  col: C.FIRST_CONTACT },
+    { label: '0次接客',   col: C.ZERO_STAGE },
+    { label: '第1面談',   col: C.FIRST_MTG },
+    { label: 'カフェ実施',col: C.CAFE_DATE },
+    { label: 'LP実施',    col: C.LP_DATE },
+    { label: 'HB実施',    col: C.HB_DATE },
+    { label: '資金計画',  col: C.SHIKIN_DATE },
+    { label: '成約',      col: C.CONTRACT },
+  ];
+  const counts = stages.map(s => rows.filter(r => parseGvizDate(getCell(r, s.col))).length);
+
+  document.getElementById('conv-rates').innerHTML = stages.slice(1).map((s, i) => {
+    const prev = counts[i]; // stages[i] count (one step before)
+    const curr = counts[i+1];
+    const rate = prev > 0 ? (curr / prev * 100).toFixed(0) : '-';
+    const color = parseFloat(rate) >= 50 ? '#16a34a' : parseFloat(rate) >= 25 ? '#d97706' : '#dc2626';
+    return `
+      <div class="card" style="text-align:center; padding:12px;">
+        <p style="font-size:10px; font-weight:700; color:#9ca3af; margin-bottom:6px;">${stages[i].label} → ${s.label}</p>
+        <p style="font-size:26px; font-weight:800; color:${rate === '-' ? '#9ca3af' : color};">${rate}${rate !== '-' ? '%' : ''}</p>
+        <p style="font-size:10px; color:#c4b9a8; margin-top:3px;">${curr} / ${prev}</p>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderFunnel(rows) {
+  const stages = [
+    { label: '新規接触',   col: C.FIRST_CONTACT },
+    { label: '0次接客',    col: C.ZERO_STAGE },
+    { label: '第1面談',    col: C.FIRST_MTG },
+    { label: 'カフェ実施', col: C.CAFE_DATE },
+    { label: 'LP実施',     col: C.LP_DATE },
+    { label: 'HB実施',     col: C.HB_DATE },
+    { label: '資金計画',   col: C.SHIKIN_DATE },
+    { label: '成約/P申込', col: C.CONTRACT },
+  ];
+  const counts = stages.map(s => rows.filter(r => parseGvizDate(getCell(r, s.col))).length);
+  const funnelColors = ['#c4b9a8','#a09080','#6b6b6b','#4a4a4a','#c9805a','#d4480a','#e85d26','#1a1a1a'];
+
+  createChart('funnelChart', {
+    type: 'bar',
+    data: {
+      labels: stages.map(s => s.label),
+      datasets: [{ data: counts, backgroundColor: funnelColors, borderRadius: 5, borderWidth: 0 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const prev = ctx.dataIndex > 0 ? counts[ctx.dataIndex-1] : null;
+              const rate = prev && prev > 0 ? ` (前段階比 ${(ctx.raw/prev*100).toFixed(0)}%)` : '';
+              return ` ${ctx.raw}名${rate}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#f0ece7' }, ticks: { stepSize: 1 } },
+        y: { grid: { display: false }, ticks: { font: { size: 12 } } }
+      }
+    }
+  });
+
+  const ltDefs = [
+    { label: '初接触→カフェ', col: C.CAFE_LT, color: '#6b6b6b' },
+    { label: 'カフェ→LP',    col: C.LP_LT,   color: '#c9805a' },
+    { label: 'LP→HB',        col: C.HB_LT,   color: '#d4480a' },
+    { label: 'HB→資計',      col: C.CL_LT,   color: '#e85d26' },
+  ];
+  document.getElementById('funnel-lt').innerHTML = ltDefs.map(lt => {
+    const vals = rows.map(r => parseFloat(getVal(r, lt.col))).filter(v => !isNaN(v) && v > 0);
+    const avg  = vals.length ? Math.round(vals.reduce((a,b) => a+b, 0) / vals.length) : null;
+    return `
+      <div style="background:#f5f3f0; border-radius:10px; padding:10px; text-align:center; border-left:3px solid ${lt.color};">
+        <p style="font-size:10px; color:#9ca3af; font-weight:600;">${lt.label}</p>
+        <p style="font-size:20px; font-weight:800; color:${lt.color}; margin:2px 0;">${avg !== null ? avg : '-'}</p>
+        <p style="font-size:10px; color:#c4b9a8;">平均日数</p>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderModelHouse(rows) {
+  const map = {};
+  rows.forEach(r => { const m = getVal(r, C.MODEL_HOUSE) || '未設定'; map[m] = (map[m]||0)+1; });
+  const sorted = Object.entries(map).sort((a,b) => b[1]-a[1]);
+  createChart('modelChart', {
+    type: 'doughnut',
+    data: {
+      labels: sorted.map(([k]) => k),
+      datasets: [{ data: sorted.map(([,v]) => v), backgroundColor: CHART_COLORS, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, cutout: '55%',
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 8 } } }
+    }
+  });
+}
+
+function renderStageCmp(rows) {
+  const now   = new Date();
+  const thisM = monthBounds(now.getFullYear(), now.getMonth());
+  const lastM = monthBounds(now.getFullYear(), now.getMonth()-1);
+  const stages = [
+    { label: '新規接触', col: C.FIRST_CONTACT },
+    { label: 'カフェ',   col: C.CAFE_DATE },
+    { label: 'LP',       col: C.LP_DATE },
+    { label: 'HB',       col: C.HB_DATE },
+    { label: '成約',     col: C.CONTRACT },
+  ];
+  const base = getAdvRows();
+  const thisData = stages.map(s => countInRange(base, s.col, thisM.start, thisM.end));
+  const lastData = stages.map(s => countInRange(base, s.col, lastM.start, lastM.end));
+
+  createChart('stageCmpChart', {
+    type: 'bar',
+    data: {
+      labels: stages.map(s => s.label),
+      datasets: [
+        { label: '今月', data: thisData, backgroundColor: 'rgba(232,93,38,.85)', borderRadius: 4 },
+        { label: '先月', data: lastData, backgroundColor: 'rgba(196,185,168,.7)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, color: '#4a4a4a' } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 12 } } },
+        y: { beginAtZero: true, grid: { color: '#f0ece7' }, ticks: { stepSize: 1 } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// MONTHLY TREND
+// ─────────────────────────────────────────────────────────────
+function renderMonthly(rows) {
+  const monthly = {};
+  const ensure = k => { if (!monthly[k]) monthly[k] = { new:0, cafe:0, lp:0, contract:0 }; };
+  rows.forEach(row => {
+    const d0  = parseGvizDate(getCell(row, C.FIRST_CONTACT));
+    const d14 = parseGvizDate(getCell(row, C.CAFE_DATE));
+    const d24 = parseGvizDate(getCell(row, C.LP_DATE));
+    const d43 = parseGvizDate(getCell(row, C.CONTRACT));
+    if (d0)  { const k = monthKey(d0);  ensure(k); monthly[k].new++; }
+    if (d14) { const k = monthKey(d14); ensure(k); monthly[k].cafe++; }
+    if (d24) { const k = monthKey(d24); ensure(k); monthly[k].lp++; }
+    if (d43) { const k = monthKey(d43); ensure(k); monthly[k].contract++; }
+  });
+  const labels = Object.keys(monthly).sort().slice(-12);
+  createChart('monthlyChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '新規接触',   data: labels.map(m => monthly[m]?.new||0),      backgroundColor: 'rgba(196,185,168,.7)' },
+        { label: 'カフェ実施', data: labels.map(m => monthly[m]?.cafe||0),     backgroundColor: 'rgba(107,107,107,.7)' },
+        { label: 'LP実施',     data: labels.map(m => monthly[m]?.lp||0),       backgroundColor: 'rgba(201,128,90,.7)' },
+        { label: 'P申込',      data: labels.map(m => monthly[m]?.contract||0), backgroundColor: 'rgba(232,93,38,.85)' },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, color: '#4a4a4a' } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { beginAtZero: true, grid: { color: '#f0ece7' }, ticks: { stepSize: 1 } }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB 3: TEAM
+// ─────────────────────────────────────────────────────────────
+
+// 期間内活動実績（各実施日ベース – 単月の数値に対応）
+function renderAdvActivity() {
+  const start = filterState.start;
+  const end   = filterState.end;
+  const base  = getAdvRows(); // ADVフィルターのみ・期間なし
+
+  const staffSet = [...new Set(base.map(r => getVal(r, C.ADV)).filter(Boolean))].sort();
+
+  const data = staffSet.map(name => {
+    const sr = base.filter(r => getVal(r, C.ADV) === name);
+    const cnt = col => sr.filter(r => {
+      const d = parseGvizDate(getCell(r, col));
+      if (!d) return false;
+      if (start && d < start) return false;
+      if (end   && d > end)   return false;
+      return true;
+    }).length;
+    return {
+      name,
+      newC:     cnt(C.FIRST_CONTACT),
+      cafe:     cnt(C.CAFE_DATE),
+      lp:       cnt(C.LP_DATE),
+      hb:       cnt(C.HB_DATE),
+      contract: cnt(C.CONTRACT),
+    };
+  }).filter(d => d.newC + d.cafe + d.lp + d.hb + d.contract > 0)
+    .sort((a, b) => b.contract - a.contract || b.cafe - a.cafe);
+
+  const tot = data.reduce((t, d) => ({
+    newC: t.newC + d.newC, cafe: t.cafe + d.cafe,
+    lp: t.lp + d.lp, hb: t.hb + d.hb, contract: t.contract + d.contract,
+  }), { newC:0, cafe:0, lp:0, hb:0, contract:0 });
+
+  const periodLabel = (start || end)
+    ? `${start ? formatDate(start) : '〜'} 〜 ${end ? formatDate(end) : '〜'}`
+    : '全期間';
+
+  const rate = (a, b) => b > 0 ? (a / b * 100).toFixed(0) + '%' : '-';
+  const rateF = (a, b) => b > 0 ? (a / b * 100).toFixed(1) + '%' : '-';
+  const badgeCls = pct => parseFloat(pct) >= 5 ? 'badge-green' : parseFloat(pct) >= 2 ? 'badge-yellow' : 'badge-red';
+
+  const rowHtml = d => {
+    const cr = rateF(d.contract, d.newC);
+    return `<tr>
+      <td style="font-weight:600;">${d.name}</td>
+      <td>${d.newC}</td>
+      <td style="color:#6b6b6b;font-weight:600;">${d.cafe}</td>
+      <td style="color:#6b6b6b;">${rate(d.cafe, d.newC)}</td>
+      <td style="color:#c9805a;font-weight:600;">${d.lp}</td>
+      <td style="color:#c9805a;">${rate(d.lp, d.cafe)}</td>
+      <td style="color:#d4480a;font-weight:600;">${d.hb}</td>
+      <td style="color:#e85d26;font-weight:700;">${d.contract}</td>
+      <td><span class="badge ${badgeCls(cr)}">${cr}</span></td>
+    </tr>`;
+  };
+
+  const totCr = rateF(tot.contract, tot.newC);
+  document.getElementById('adv-activity-table').innerHTML = `
+    <p style="font-size:11px;color:#9ca3af;margin-bottom:10px;">集計期間: <strong style="color:#1a1a1a;">${periodLabel}</strong></p>
+    <div style="overflow-x:auto;">
+      <table class="dtable">
+        <thead>
+          <tr>
+            <th>担当ADV</th>
+            <th>新規接触</th>
+            <th>カフェ実施</th><th>カフェ率</th>
+            <th>LP実施</th><th>LP率(対カフェ)</th>
+            <th>HB実施</th>
+            <th>P申込</th><th>P申込率(対新規)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map(rowHtml).join('')}
+          <tr style="font-weight:700;background:#f5f3f0;border-top:2px solid #e5e0d8;">
+            <td>合計</td>
+            <td>${tot.newC}</td>
+            <td style="color:#6b6b6b;">${tot.cafe}</td>
+            <td style="color:#6b6b6b;">${rate(tot.cafe, tot.newC)}</td>
+            <td style="color:#c9805a;">${tot.lp}</td>
+            <td style="color:#c9805a;">${rate(tot.lp, tot.cafe)}</td>
+            <td style="color:#d4480a;">${tot.hb}</td>
+            <td style="color:#e85d26;">${tot.contract}</td>
+            <td><span class="badge ${badgeCls(totCr)}">${totCr}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// 歩留まり率（初接触起点コホート）
+function renderAdvYield() {
+  const yieldTable = (rows, targetId) => {
+    const staffSet = [...new Set(rows.map(r => getVal(r, C.ADV)).filter(Boolean))].sort();
+    const data = staffSet.map(name => {
+      const sr = rows.filter(r => getVal(r, C.ADV) === name);
+      const n  = sr.length;
+      const cafe     = sr.filter(r => parseGvizDate(getCell(r, C.CAFE_DATE))).length;
+      const lp       = sr.filter(r => parseGvizDate(getCell(r, C.LP_DATE))).length;
+      const hb       = sr.filter(r => parseGvizDate(getCell(r, C.HB_DATE))).length;
+      const contract = sr.filter(r => parseGvizDate(getCell(r, C.CONTRACT))).length;
+      return { name, n, cafe, lp, hb, contract };
+    }).filter(d => d.n > 0).sort((a, b) => b.contract - a.contract);
+
+    const pct = (a, b) => b > 0 ? (a / b * 100).toFixed(0) + '%' : '-';
+    const pctF = (a, b) => b > 0 ? (a / b * 100).toFixed(1) + '%' : '-';
+    const cls = v => parseFloat(v) >= 50 ? '#16a34a' : parseFloat(v) >= 25 ? '#d97706' : '#dc2626';
+
+    const tot = data.reduce((t, d) => ({
+      n: t.n+d.n, cafe: t.cafe+d.cafe, lp: t.lp+d.lp, hb: t.hb+d.hb, contract: t.contract+d.contract
+    }), { n:0, cafe:0, lp:0, hb:0, contract:0 });
+
+    const cell = (v, b) => {
+      const p = pct(v, b);
+      return `<td style="font-weight:600;color:${p !== '-' ? cls(p) : '#9ca3af'};">${p}</td>`;
+    };
+
+    document.getElementById(targetId).innerHTML = `
+      <div style="overflow-x:auto;">
+        <table class="dtable">
+          <thead>
+            <tr>
+              <th>担当ADV</th><th>新規</th>
+              <th>カフェ率</th><th>→LP率</th><th>→HB率</th>
+              <th>P申込率</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(d => `<tr>
+              <td style="font-weight:600;">${d.name}</td>
+              <td style="color:#9ca3af;">${d.n}</td>
+              ${cell(d.cafe, d.n)}
+              ${cell(d.lp, d.cafe)}
+              ${cell(d.hb, d.lp)}
+              <td><span class="badge ${parseFloat(pctF(d.contract,d.n)) >= 5 ? 'badge-green' : parseFloat(pctF(d.contract,d.n)) >= 2 ? 'badge-yellow' : 'badge-red'}">${pctF(d.contract, d.n)}</span></td>
+            </tr>`).join('')}
+            <tr style="font-weight:700;background:#f5f3f0;border-top:2px solid #e5e0d8;">
+              <td>合計</td><td style="color:#9ca3af;">${tot.n}</td>
+              ${cell(tot.cafe, tot.n)}
+              ${cell(tot.lp, tot.cafe)}
+              ${cell(tot.hb, tot.lp)}
+              <td><span class="badge ${parseFloat(pctF(tot.contract,tot.n)) >= 5 ? 'badge-green' : parseFloat(pctF(tot.contract,tot.n)) >= 2 ? 'badge-yellow' : 'badge-red'}">${pctF(tot.contract, tot.n)}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  };
+
+  yieldTable(getFilteredRows(), 'adv-yield-filtered'); // 期間フィルター適用（初接触日ベース）
+  yieldTable(getAdvRows(),      'adv-yield-all');       // 全期間（ADVフィルターのみ）
+}
+
+function renderStaff(rows) {
+  const map = {};
+  rows.forEach(row => {
+    const staff = getVal(row, C.ADV) || '未設定';
+    if (!map[staff]) map[staff] = { total:0, zero:0, mtg:0, cafe:0, lp:0, hb:0, shikin:0, contract:0 };
+    const d = map[staff];
+    d.total++;
+    if (parseGvizDate(getCell(row, C.ZERO_STAGE)))  d.zero++;
+    if (parseGvizDate(getCell(row, C.FIRST_MTG)))   d.mtg++;
+    if (parseGvizDate(getCell(row, C.CAFE_DATE)))   d.cafe++;
+    if (parseGvizDate(getCell(row, C.LP_DATE)))     d.lp++;
+    if (parseGvizDate(getCell(row, C.HB_DATE)))     d.hb++;
+    if (parseGvizDate(getCell(row, C.SHIKIN_DATE))) d.shikin++;
+    if (parseGvizDate(getCell(row, C.CONTRACT)))    d.contract++;
+  });
+  const sorted = Object.entries(map).sort((a,b) => b[1].total - a[1].total);
+  const names  = sorted.map(([n]) => n);
+  const vals   = sorted.map(([,d]) => d);
+
+  createChart('staffChart', {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [
+        { label: 'カフェ', data: vals.map(d => d.cafe),     backgroundColor: 'rgba(107,107,107,.75)' },
+        { label: 'LP',     data: vals.map(d => d.lp),       backgroundColor: 'rgba(201,128,90,.75)' },
+        { label: 'HB',     data: vals.map(d => d.hb),       backgroundColor: 'rgba(212,72,10,.75)' },
+        { label: '成約',   data: vals.map(d => d.contract), backgroundColor: 'rgba(232,93,38,.9)' },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, color: '#4a4a4a' } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { beginAtZero: true, grid: { color: '#f0ece7' }, ticks: { stepSize: 1 } }
+      }
+    }
+  });
+
+  document.getElementById('staff-tbody').innerHTML = sorted.map(([name, d]) => {
+    const rate = d.total > 0 ? (d.contract / d.total * 100).toFixed(1) : '0.0';
+    const rateClass = parseFloat(rate) >= 5 ? 'badge-green' : parseFloat(rate) >= 2 ? 'badge-yellow' : 'badge-red';
+    return `
+      <tr>
+        <td style="font-weight:600;">${name}</td>
+        <td>${d.total}</td><td>${d.zero}</td><td>${d.mtg}</td>
+        <td style="color:#6b6b6b;font-weight:600;">${d.cafe}</td>
+        <td style="color:#c9805a;font-weight:600;">${d.lp}</td>
+        <td style="color:#d4480a;font-weight:600;">${d.hb}</td>
+        <td>${d.shikin}</td>
+        <td style="color:#e85d26;font-weight:700;">${d.contract}</td>
+        <td><span class="badge ${rateClass}">${rate}%</span></td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:20px;">データなし</td></tr>';
+}
+
+function renderRanking(rows) {
+  // 受注ランキング
+  const contractMap = {};
+  rows.forEach(r => {
+    if (!parseGvizDate(getCell(r, C.CONTRACT))) return;
+    const name = getVal(r, C.ADV) || '未設定';
+    contractMap[name] = (contractMap[name] || 0) + 1;
+  });
+  const contractRank = Object.entries(contractMap).sort((a,b) => b[1]-a[1]).slice(0, 10);
+  const maxC = contractRank[0]?.[1] || 1;
+
+  document.getElementById('contract-ranking').innerHTML = contractRank.length > 0
+    ? contractRank.map(([name, cnt], i) => {
+        const medal = i === 0 ? '#e85d26' : i === 1 ? '#c9805a' : i === 2 ? '#a07850' : '#9ca3af';
+        return `
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f0ece7;">
+            <span style="font-size:12px;font-weight:800;color:${medal};width:22px;text-align:center;">${i+1}</span>
+            <span style="font-size:13px;font-weight:600;flex:1;">${name}</span>
+            <div style="width:90px;background:#f0ece7;border-radius:4px;height:6px;">
+              <div style="width:${(cnt/maxC*100).toFixed(0)}%;background:${medal};height:100%;border-radius:4px;"></div>
+            </div>
+            <span style="font-size:14px;font-weight:800;color:${medal};width:32px;text-align:right;">${cnt}</span>
+          </div>`;
+      }).join('')
+    : '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">対象データなし</p>';
+
+  // LT優秀者（全期間）
+  const ltMap = {};
+  getAdvRows().forEach(r => {
+    const cafe = parseGvizDate(getCell(r, C.CAFE_DATE));
+    const contract = parseGvizDate(getCell(r, C.CONTRACT));
+    if (!cafe || !contract) return;
+    const lt = Math.round((contract - cafe) / 86400000);
+    if (lt <= 0 || lt > 1000) return;
+    const name = getVal(r, C.ADV) || '未設定';
+    if (!ltMap[name]) ltMap[name] = [];
+    ltMap[name].push(lt);
+  });
+  const ltRank = Object.entries(ltMap)
+    .map(([name, arr]) => ({ name, avg: Math.round(arr.reduce((a,b) => a+b,0)/arr.length), count: arr.length }))
+    .sort((a,b) => a.avg - b.avg).slice(0, 10);
+
+  document.getElementById('lt-ranking').innerHTML = ltRank.length > 0
+    ? ltRank.map((item, i) => {
+        const medal = i === 0 ? '#e85d26' : i === 1 ? '#c9805a' : i === 2 ? '#a07850' : '#9ca3af';
+        return `
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f0ece7;">
+            <span style="font-size:12px;font-weight:800;color:${medal};width:22px;text-align:center;">${i+1}</span>
+            <span style="font-size:13px;font-weight:600;flex:1;">${item.name}</span>
+            <span style="font-size:11px;color:#c4b9a8;">${item.count}件</span>
+            <span style="font-size:14px;font-weight:800;color:${medal};width:50px;text-align:right;">${item.avg}日</span>
+          </div>`;
+      }).join('')
+    : '<p style="color:#9ca3af;font-size:13px;text-align:center;padding:20px;">対象データなし</p>';
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB 4: PREDICT
+// ─────────────────────────────────────────────────────────────
+function renderForecast(rows) {
+  const now = new Date();
+  const base = getAdvRows();
+
+  const closedWithCafe = base.filter(r =>
+    parseGvizDate(getCell(r, C.CAFE_DATE)) && parseGvizDate(getCell(r, C.CONTRACT))
+  );
+  const ltDays = closedWithCafe.map(r => {
+    const cafe     = parseGvizDate(getCell(r, C.CAFE_DATE));
+    const contract = parseGvizDate(getCell(r, C.CONTRACT));
+    return Math.round((contract - cafe) / 86400000);
+  }).filter(d => d > 0 && d < 1000);
+  const avgLT = ltDays.length ? Math.round(ltDays.reduce((a,b) => a+b, 0) / ltDays.length) : null;
+
+  const pipeline = rows.filter(r =>
+    parseGvizDate(getCell(r, C.CAFE_DATE)) && !parseGvizDate(getCell(r, C.CONTRACT))
+  );
+
+  const nmStart = new Date(now.getFullYear(), now.getMonth()+1, 1);
+  const nmEnd   = new Date(now.getFullYear(), now.getMonth()+2, 0, 23, 59, 59);
+  const nmLabel = `${nmStart.getFullYear()}年${nmStart.getMonth()+1}月`;
+
+  const forecastRows = avgLT ? pipeline.filter(r => {
+    const cafe = parseGvizDate(getCell(r, C.CAFE_DATE));
+    const pred = new Date(cafe); pred.setDate(pred.getDate() + avgLT);
+    return pred >= nmStart && pred <= nmEnd;
+  }) : [];
+
+  const tmStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const tmEnd   = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
+  const tmForecast = avgLT ? pipeline.filter(r => {
+    const cafe = parseGvizDate(getCell(r, C.CAFE_DATE));
+    const pred = new Date(cafe); pred.setDate(pred.getDate() + avgLT);
+    return pred >= tmStart && pred <= tmEnd;
+  }).length : 0;
+
+  // 高確度パイプライン（HB以降）
+  const highPipeline = rows.filter(r =>
+    parseGvizDate(getCell(r, C.HB_DATE)) && !parseGvizDate(getCell(r, C.CONTRACT))
+  ).length;
+
+  document.getElementById('forecast-section').innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px;">
+      <div style="background:#f5f3f0; border-radius:12px; padding:16px; border-left:4px solid #1a1a1a;">
+        <p style="font-size:11px; font-weight:700; color:#6b6b6b;">カフェ→成約 平均LT</p>
+        <p style="font-size:32px; font-weight:800; color:#1a1a1a; margin:4px 0;">${avgLT != null ? avgLT+'日' : 'N/A'}</p>
+        <p style="font-size:11px; color:#c4b9a8;">成約実績 ${closedWithCafe.length}件</p>
+      </div>
+      <div style="background:#f5f3f0; border-radius:12px; padding:16px; border-left:4px solid #c9805a;">
+        <p style="font-size:11px; font-weight:700; color:#a07850;">カフェ滞留中</p>
+        <p style="font-size:32px; font-weight:800; color:#6b3a1f; margin:4px 0;">${pipeline.length}名</p>
+        <p style="font-size:11px; color:#c4b9a8;">未成約 カフェ済み</p>
+      </div>
+      <div style="background:#fff7f2; border-radius:12px; padding:16px; border-left:4px solid #d4480a;">
+        <p style="font-size:11px; font-weight:700; color:#d4480a;">高確度パイプライン</p>
+        <p style="font-size:32px; font-weight:800; color:#a83200; margin:4px 0;">${highPipeline}名</p>
+        <p style="font-size:11px; color:#c4b9a8;">HB以降・未成約</p>
+      </div>
+      <div style="background:#fff7f2; border-radius:12px; padding:16px; border-left:4px solid #d4480a;">
+        <p style="font-size:11px; font-weight:700; color:#d4480a;">今月 予測P申込</p>
+        <p style="font-size:32px; font-weight:800; color:#a83200; margin:4px 0;">${tmForecast}名</p>
+        <p style="font-size:11px; color:#c4b9a8;">${now.getMonth()+1}月中到達予測</p>
+      </div>
+      <div style="background:#fff3ed; border-radius:12px; padding:16px; border:2px solid #e85d26;">
+        <p style="font-size:11px; font-weight:700; color:#e85d26;">来月（${nmLabel}）予測</p>
+        <p style="font-size:36px; font-weight:800; color:#c2410c; margin:4px 0;">${forecastRows.length}名</p>
+        <p style="font-size:11px; color:#c4b9a8;">カフェ実施日 + ${avgLT != null ? avgLT : '-'}日</p>
+      </div>
+    </div>
+
+    ${forecastRows.length > 0 ? `
+      <p style="font-size:11px; font-weight:700; color:#9ca3af; margin-bottom:8px;">来月予測 対象顧客一覧</p>
+      <div style="overflow-x:auto;">
+        <table class="dtable">
+          <thead><tr>
+            <th>顧客名</th><th>担当ADV</th><th>カフェ実施日</th><th>予測成約日</th><th>経過/残日数</th>
+          </tr></thead>
+          <tbody>
+            ${forecastRows.map(r => {
+              const cafeDate = parseGvizDate(getCell(r, C.CAFE_DATE));
+              const pred = new Date(cafeDate); pred.setDate(pred.getDate() + avgLT);
+              const elapsed   = Math.round((now - cafeDate) / 86400000);
+              const remaining = Math.round((pred - now) / 86400000);
+              return `<tr>
+                <td style="font-weight:600;">${getVal(r, C.NAME) || '-'}</td>
+                <td>${getVal(r, C.ADV) || '-'}</td>
+                <td>${formatDate(cafeDate)}</td>
+                <td style="color:#e85d26; font-weight:700;">${formatDate(pred)}</td>
+                <td>${elapsed}日経過 / あと${remaining > 0 ? remaining : 0}日</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : `<p style="font-size:13px; color:#9ca3af; text-align:center; padding:20px 0;">
+      ${avgLT ? `来月（${nmLabel}）の予測対象顧客はいません` : 'P申込の実績データが不足しています'}
+    </p>`}
+  `;
+}
+
+function renderRecent(rows) {
+  const sorted = [...rows]
+    .filter(r => parseGvizDate(getCell(r, C.FIRST_CONTACT)))
+    .sort((a,b) => parseGvizDate(getCell(b, C.FIRST_CONTACT)) - parseGvizDate(getCell(a, C.FIRST_CONTACT)))
+    .slice(0, 10);
+
+  document.getElementById('recent-tbody').innerHTML = sorted.map(r => {
+    const stage = getCurrentStage(r);
+    return `
+      <tr>
+        <td>${formatDate(parseGvizDate(getCell(r, C.FIRST_CONTACT)))}</td>
+        <td style="font-weight:600;">${getVal(r, C.NAME) || '-'}</td>
+        <td>${getVal(r, C.ADV) || '-'}</td>
+        <td>${getVal(r, C.MODEL_HOUSE) || '-'}</td>
+        <td><span class="stage-badge" style="background:${stage.color}18; color:${stage.color};">${stage.label}</span></td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:20px;">データなし</td></tr>';
+}
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+function showLoading(v) { document.getElementById('loading').classList.toggle('hidden', !v); }
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  if (msg) { document.getElementById('error-msg').textContent = msg; el.classList.remove('hidden'); }
+  else { el.classList.add('hidden'); }
+}
+
+async function init() {
+  showLoading(true); showError(null);
+  try {
+    const rawRows = await fetchData();
+    allValidRows = rawRows.filter(isValidCustomer);
+    setupStaffMultiSelect(allValidRows);
+    reRenderTab(currentTab);
+    const now = new Date();
+    document.getElementById('last-update').textContent =
+      `最終更新: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  } catch(e) {
+    console.error(e);
+    showError('データの取得に失敗しました。GAS URLまたはネットワークを確認してください。');
+  } finally {
+    showLoading(false);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setupFilters();
+  init();
+  setInterval(init, 5 * 60 * 1000);
+});
+</script>
+</body>
+</html>
